@@ -43,21 +43,34 @@ def hyperparameter_grid(dataset_name: str, model_name: str) -> list[dict[str, fl
     if dataset_name == "moons":
         if model_name == "single_layer":
             return [
-                {"optimizer": "sgd", "lr": 0.03, "batch_size": 16, "epochs": 220},
-                {"optimizer": "adam_like", "lr": 0.02, "batch_size": 16, "epochs": 220},
+                {"optimizer": "sgd", "lr": 0.01, "batch_size": 16, "epochs": 220},
+                {"optimizer": "sgd", "lr": 0.03, "batch_size": 32, "epochs": 220},
+                {"optimizer": "adam_like", "lr": 0.005, "batch_size": 16, "epochs": 220},
+                {"optimizer": "adam_like", "lr": 0.01, "batch_size": 32, "epochs": 220},
             ]
         return [
+            {"optimizer": "sgd", "lr": 0.03, "batch_size": 16, "epochs": 260},
             {"optimizer": "sgd", "lr": 0.05, "batch_size": 16, "epochs": 260},
+            {"optimizer": "sgd", "lr": 0.03, "batch_size": 32, "epochs": 260},
+            {"optimizer": "adam_like", "lr": 0.005, "batch_size": 16, "epochs": 260},
             {"optimizer": "adam_like", "lr": 0.01, "batch_size": 16, "epochs": 260},
+            {"optimizer": "adam_like", "lr": 0.005, "batch_size": 32, "epochs": 260},
         ]
     if model_name == "single_layer":
         return [
+            {"optimizer": "sgd", "lr": 0.01, "batch_size": 16, "epochs": 220},
             {"optimizer": "sgd", "lr": 0.03, "batch_size": 16, "epochs": 220},
-            {"optimizer": "adam_like", "lr": 0.01, "batch_size": 16, "epochs": 220},
+            {"optimizer": "sgd", "lr": 0.02, "batch_size": 32, "epochs": 220},
+            {"optimizer": "adam_like", "lr": 0.005, "batch_size": 16, "epochs": 220},
+            {"optimizer": "adam_like", "lr": 0.01, "batch_size": 32, "epochs": 220},
         ]
     return [
+        {"optimizer": "sgd", "lr": 0.02, "batch_size": 16, "epochs": 260},
         {"optimizer": "sgd", "lr": 0.03, "batch_size": 16, "epochs": 260},
+        {"optimizer": "sgd", "lr": 0.02, "batch_size": 32, "epochs": 260},
+        {"optimizer": "adam_like", "lr": 0.005, "batch_size": 16, "epochs": 260},
         {"optimizer": "adam_like", "lr": 0.008, "batch_size": 16, "epochs": 260},
+        {"optimizer": "adam_like", "lr": 0.005, "batch_size": 32, "epochs": 260},
     ]
 
 
@@ -95,6 +108,7 @@ def choose_best_configuration(dataset) -> tuple[dict[str, object], list[dict[str
                 "val_f1": val_metrics["f1"],
                 "history": training.history,
                 "model_obj": model,
+                "trainable_params": int(sum(value.size for value in model.parameters().values())),
             }
             all_runs.append(run)
             if best_run is None or (
@@ -124,6 +138,21 @@ def _save_learning_curve(dataset_name: str, all_runs: list[dict[str, object]]) -
     plt.close()
 
 
+def _save_loss_curve(dataset_name: str, all_runs: list[dict[str, object]]) -> None:
+    plt.figure(figsize=(8, 5))
+    for run in all_runs:
+        history = pd.DataFrame(run["history"])
+        label = f"{run['model']} + {run['optimizer']}"
+        plt.plot(history["epoch"], history["val_loss"], label=label)
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation loss")
+    plt.title(f"Validation loss: {dataset_name}")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(IMG_DIR / f"loss_curve_{dataset_name}.png", dpi=180)
+    plt.close()
+
+
 def _save_decision_boundary(dataset, model, dataset_name: str) -> None:
     if dataset.X_train.shape[1] != 2:
         return
@@ -144,11 +173,34 @@ def _save_decision_boundary(dataset, model, dataset_name: str) -> None:
     plt.close()
 
 
+def _save_confusion_matrix(dataset_name: str, y_true: np.ndarray, y_prob: np.ndarray) -> None:
+    y_true = y_true.reshape(-1, 1).astype(int)
+    y_pred = (y_prob.reshape(-1, 1) >= 0.5).astype(int)
+    tp = int(np.sum((y_pred == 1) & (y_true == 1)))
+    tn = int(np.sum((y_pred == 0) & (y_true == 0)))
+    fp = int(np.sum((y_pred == 1) & (y_true == 0)))
+    fn = int(np.sum((y_pred == 0) & (y_true == 1)))
+    matrix = np.array([[tn, fp], [fn, tp]])
+
+    plt.figure(figsize=(4.5, 4))
+    plt.imshow(matrix, cmap="Blues")
+    plt.xticks([0, 1], ["pred 0", "pred 1"])
+    plt.yticks([0, 1], ["true 0", "true 1"])
+    plt.title(f"Confusion matrix: {dataset_name}")
+    for i in range(2):
+        for j in range(2):
+            plt.text(j, i, str(matrix[i, j]), ha="center", va="center", color="black")
+    plt.tight_layout()
+    plt.savefig(IMG_DIR / f"confusion_matrix_{dataset_name}.png", dpi=180)
+    plt.close()
+
+
 def run_all_experiments() -> list[dict[str, object]]:
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     datasets = build_datasets()
     rows: list[dict[str, object]] = []
     full_report: list[dict[str, object]] = []
+    all_runs_rows: list[dict[str, object]] = []
 
     for dataset in datasets:
         best_run, all_runs = choose_best_configuration(dataset)
@@ -161,10 +213,12 @@ def run_all_experiments() -> list[dict[str, object]]:
             "dataset": dataset.name,
             "best_model": best_run["model"],
             "best_optimizer": best_run["optimizer"],
+            "isu_id": ISU_ID,
             "learning_rate": best_run["learning_rate"],
             "batch_size": best_run["batch_size"],
             "epochs_ran": best_run["epochs_ran"],
             "best_epoch": best_run["best_epoch"],
+            "trainable_params": best_run["trainable_params"],
             "train_loss": train_metrics["loss"],
             "train_accuracy": train_metrics["accuracy"],
             "val_loss": val_metrics["loss"],
@@ -185,13 +239,35 @@ def run_all_experiments() -> list[dict[str, object]]:
                 ],
             }
         )
+        for run in all_runs:
+            run_row = {
+                "dataset": dataset.name,
+                "model": run["model"],
+                "optimizer": run["optimizer"],
+                "learning_rate": run["learning_rate"],
+                "batch_size": run["batch_size"],
+                "epochs_ran": run["epochs_ran"],
+                "best_epoch": run["best_epoch"],
+                "trainable_params": run["trainable_params"],
+                "val_loss": run["val_loss"],
+                "val_accuracy": run["val_accuracy"],
+                "val_f1": run["val_f1"],
+            }
+            all_runs_rows.append(run_row)
         _save_learning_curve(dataset.name, all_runs)
+        _save_loss_curve(dataset.name, all_runs)
         _save_decision_boundary(dataset, model, dataset.name)
+        _save_confusion_matrix(dataset.name, dataset.y_test, model.predict_proba(dataset.X_test))
 
     with (IMG_DIR / "summary.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+
+    with (IMG_DIR / "all_runs.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(all_runs_rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(all_runs_rows)
 
     with (IMG_DIR / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(full_report, handle, ensure_ascii=False, indent=2)
@@ -201,4 +277,3 @@ def run_all_experiments() -> list[dict[str, object]]:
 
 if __name__ == "__main__":
     run_all_experiments()
-

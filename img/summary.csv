@@ -1,3 +1,3 @@
-dataset,best_model,best_optimizer,learning_rate,batch_size,epochs_ran,best_epoch,train_loss,train_accuracy,val_loss,val_accuracy,test_loss,test_accuracy,test_precision,test_recall,test_f1
-moons,hidden_layer_perceptron,sgd,0.05,16,80,55,0.04199861596699585,0.9958333333333333,0.16096195634940086,0.9625,0.06807228207985223,0.975,0.9772727270506198,0.9772727270506198,0.9772727220506199
-classification5d,hidden_layer_perceptron,sgd,0.03,16,49,24,0.09953629240083822,0.9666666666666667,0.19345515037859756,0.95,0.2559336833937323,0.9,0.89999999955,0.89999999955,0.89999999455
+dataset,best_model,best_optimizer,isu_id,learning_rate,batch_size,epochs_ran,best_epoch,trainable_params,train_loss,train_accuracy,val_loss,val_accuracy,test_loss,test_accuracy,test_precision,test_recall,test_f1
+moons,hidden_layer_perceptron,adam_like,0,0.005,16,119,94,49,0.03042671677540386,0.9916666666666667,0.116270280053135,0.9625,0.05625649531604489,0.975,0.9772727270506198,0.9772727270506198,0.9772727220506199
+classification5d,hidden_layer_perceptron,adam_like,0,0.005,32,64,39,85,0.12269129435313815,0.9583333333333334,0.18155158982570074,0.95,0.23212518367650894,0.9,0.89999999955,0.89999999955,0.89999999455
